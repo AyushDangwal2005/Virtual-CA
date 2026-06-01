@@ -1,7 +1,24 @@
-// Global application state - computed from actual department data
+// Global application state managed via localStorage
+export interface JournalEntry {
+  id: string;
+  date: string;
+  description: string;
+  account: string;
+  debit: number;
+  credit: number;
+}
+
+export interface ComplianceFiling {
+  id: string;
+  filing: string;
+  deadline: string;
+  status: 'completed' | 'pending' | 'overdue';
+  penalty?: number;
+}
+
 export interface AppState {
   bookkeeping: {
-    entries: Array<{ id: string; date: string; description: string; account: string; debit: number; credit: number }>;
+    entries: JournalEntry[];
     totalDebit: number;
     totalCredit: number;
     balance: number;
@@ -17,7 +34,7 @@ export interface AppState {
     tdsAmount: number;
   };
   compliance: {
-    filings: Array<{ name: string; dueDate: string; status: 'completed' | 'pending' | 'overdue'; penalty: number }>;
+    filings: ComplianceFiling[];
     completionRate: number;
   };
   audit: {
@@ -52,7 +69,6 @@ export interface AppState {
   };
 }
 
-// Initialize empty state
 export const createEmptyState = (): AppState => ({
   bookkeeping: {
     entries: [],
@@ -71,8 +87,14 @@ export const createEmptyState = (): AppState => ({
     tdsAmount: 0,
   },
   compliance: {
-    filings: [],
-    completionRate: 0,
+    filings: [
+      { id: '1', filing: 'Annual Tax Return (ITR)', deadline: '2026-07-31', status: 'pending' },
+      { id: '2', filing: 'Quarterly GST Return', deadline: '2026-06-30', status: 'completed' },
+      { id: '3', filing: 'Annual Audit Report', deadline: '2026-08-15', status: 'pending' },
+      { id: '4', filing: 'Form 16 Generation', deadline: '2026-06-30', status: 'completed' },
+      { id: '5', filing: 'TDS Returns', deadline: '2026-06-10', status: 'overdue', penalty: 5000 },
+    ],
+    completionRate: 40,
   },
   audit: {
     transactionCount: 0,
@@ -101,68 +123,88 @@ export const createEmptyState = (): AppState => ({
   },
 });
 
-// Storage key
 const STORAGE_KEY = 'virtual-ca-app-state';
 
-// Get state from localStorage
+/** Load state from localStorage, merging with defaults to handle missing keys */
 export const getAppState = (): AppState => {
-  if (typeof window === 'undefined') {
-    return createEmptyState();
-  }
-
+  if (typeof window === 'undefined') return createEmptyState();
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : createEmptyState();
-  } catch (error) {
-    console.error('[v0] Failed to load state:', error);
+    if (!stored) return createEmptyState();
+    const parsed = JSON.parse(stored) as Partial<AppState>;
+    const defaults = createEmptyState();
+    // Deep merge: keep defaults for any missing top-level keys
+    return {
+      bookkeeping: { ...defaults.bookkeeping, ...parsed.bookkeeping },
+      tax: { ...defaults.tax, ...parsed.tax },
+      compliance: { ...defaults.compliance, ...parsed.compliance },
+      audit: { ...defaults.audit, ...parsed.audit },
+      risk: { ...defaults.risk, ...parsed.risk },
+      forecast: { ...defaults.forecast, ...parsed.forecast },
+      cfo: { ...defaults.cfo, ...parsed.cfo },
+    };
+  } catch {
     return createEmptyState();
   }
 };
 
-// Save state to localStorage
+/** Persist state to localStorage */
 export const saveAppState = (state: AppState): void => {
   if (typeof window === 'undefined') return;
-
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error('[v0] Failed to save state:', error);
+  } catch {
+    // Storage quota exceeded or unavailable — fail silently
   }
 };
 
-// Compute dashboard metrics from actual data
+/** Compute dashboard-level KPIs from actual stored data */
 export const computeDashboardMetrics = (state: AppState) => {
   const totalRevenue = state.bookkeeping.totalDebit;
   const totalExpenses = state.bookkeeping.totalCredit;
   const taxLiability = state.tax.taxLiability;
 
-  // Calculate audit score based on actual data
+  // Audit score: from stored value or computed from entry verification ratio
   const auditScore =
-    state.audit.auditScore === 0
-      ? state.audit.transactionCount > 0
-        ? Math.min(
-            100,
-            50 + (state.audit.verifiedCount / Math.max(1, state.audit.transactionCount)) * 50
+    state.audit.auditScore > 0
+      ? state.audit.auditScore
+      : state.audit.transactionCount > 0
+      ? Math.min(
+          100,
+          Math.round(
+            50 + (state.audit.verifiedCount / state.audit.transactionCount) * 50
           )
-        : 0
-      : state.audit.auditScore;
+        )
+      : 0;
 
-  const riskLevel =
-    state.risk.overallRisk === 0
-      ? state.bookkeeping.entries.length === 0
-        ? 'No Data'
-        : 'Low'
-      : state.risk.overallRisk > 70
-      ? 'High'
-      : state.risk.overallRisk > 40
-      ? 'Medium'
-      : 'Low';
+  // Risk level: from stored overallRisk or derived from available data
+  let riskLevel: string;
+  if (state.risk.overallRisk > 0) {
+    riskLevel = state.risk.overallRisk > 70 ? 'High' : state.risk.overallRisk > 40 ? 'Medium' : 'Low';
+  } else if (state.bookkeeping.entries.length === 0) {
+    riskLevel = 'No Data';
+  } else {
+    // Derive a basic risk from compliance overdue count
+    const overdueCount = state.compliance.filings.filter((f) => f.status === 'overdue').length;
+    riskLevel = overdueCount > 2 ? 'High' : overdueCount > 0 ? 'Medium' : 'Low';
+  }
+
+  // Compliance rate from filings array
+  const completionRate =
+    state.compliance.filings.length > 0
+      ? Math.round(
+          (state.compliance.filings.filter((f) => f.status === 'completed').length /
+            state.compliance.filings.length) *
+            100
+        )
+      : 0;
 
   return {
     totalRevenue,
     totalExpenses,
     taxLiability,
-    auditScore: Math.round(auditScore),
+    auditScore,
     riskLevel,
+    completionRate,
   };
 };
