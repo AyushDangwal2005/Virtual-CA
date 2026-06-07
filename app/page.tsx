@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Menu, X, LayoutDashboard, BookOpen, Calculator, ShieldCheck, Search, AlertTriangle, TrendingUp, Briefcase } from 'lucide-react';
+import { Menu, X, LayoutDashboard, BookOpen, Calculator, ShieldCheck, Search, AlertTriangle, TrendingUp, Briefcase, FileText, MessageSquare, TrendingUpIcon, Users } from 'lucide-react';
 import { getAppState, computeDashboardMetrics } from '@/lib/app-state';
 import BookkeepingPage from '@/components/pages/bookkeeping-page';
 import TaxPage from '@/components/pages/tax-page';
@@ -10,6 +10,10 @@ import AuditPage from '@/components/pages/audit-page';
 import RiskPage from '@/components/pages/risk-page';
 import ForecastPage from '@/components/pages/forecast-page';
 import CFOPage from '@/components/pages/cfo-page';
+import InvoiceManagerPage from '@/components/pages/invoice-manager-page';
+import AIAssistantPage from '@/components/pages/ai-assistant-page';
+import AccountingManagerPage from '@/components/pages/accounting-manager-page';
+import FinancialIntelligencePage from '@/components/pages/financial-intelligence-page';
 
 type PageType =
   | 'dashboard'
@@ -19,23 +23,33 @@ type PageType =
   | 'audit'
   | 'risk'
   | 'forecast'
-  | 'cfo';
+  | 'cfo'
+  | 'invoices'
+  | 'ai-assistant'
+  | 'intelligence'
+  | 'customers';
 
 interface Department {
   id: PageType;
   label: string;
   description: string;
   icon: React.ElementType;
+  section?: 'core' | 'admin';
 }
 
 const DEPARTMENTS: Department[] = [
-  { id: 'bookkeeping', label: 'Bookkeeping', description: 'Journal entries and trial balance', icon: BookOpen },
-  { id: 'tax', label: 'Tax Planning', description: 'Income tax, GST and TDS analysis', icon: Calculator },
-  { id: 'compliance', label: 'Compliance', description: 'Filing deadlines and regulatory status', icon: ShieldCheck },
-  { id: 'audit', label: 'Audit', description: 'Transaction verification and readiness', icon: Search },
-  { id: 'risk', label: 'Risk Analytics', description: 'Cash flow and concentration risk', icon: AlertTriangle },
-  { id: 'forecast', label: 'Forecasting', description: 'Revenue projections and scenarios', icon: TrendingUp },
-  { id: 'cfo', label: 'CFO Decisions', description: 'Strategic financial recommendations', icon: Briefcase },
+  { id: 'bookkeeping', label: 'Bookkeeping', description: 'Journal entries and trial balance', icon: BookOpen, section: 'core' },
+  { id: 'invoices', label: 'Invoice Manager', description: 'Upload and track invoices with OCR', icon: FileText, section: 'core' },
+  { id: 'accounting', label: 'Accounting Manager', description: 'P&L, Balance Sheet, Cash Flow', icon: Calculator, section: 'core' },
+  { id: 'tax', label: 'Tax Planning', description: 'Income tax, GST and TDS analysis', icon: Calculator, section: 'core' },
+  { id: 'compliance', label: 'Compliance', description: 'Filing deadlines and regulatory status', icon: ShieldCheck, section: 'core' },
+  { id: 'ai-assistant', label: 'AI Finance Assistant', description: 'Ask questions, get instant answers', icon: MessageSquare, section: 'core' },
+  { id: 'intelligence', label: 'Financial Intelligence', description: 'Live market data and news', icon: TrendingUpIcon, section: 'admin' },
+  { id: 'audit', label: 'Audit', description: 'Transaction verification and readiness', icon: Search, section: 'admin' },
+  { id: 'risk', label: 'Risk Analytics', description: 'Cash flow and concentration risk', icon: AlertTriangle, section: 'admin' },
+  { id: 'forecast', label: 'Forecasting', description: 'Revenue projections and scenarios', icon: TrendingUp, section: 'admin' },
+  { id: 'cfo', label: 'CFO Decisions', description: 'Strategic financial recommendations', icon: Briefcase, section: 'admin' },
+  { id: 'customers', label: 'Customers & Vendors', description: 'Manage customer and vendor relationships', icon: Users, section: 'admin' },
 ];
 
 interface DashboardMetrics {
@@ -176,10 +190,32 @@ export default function Dashboard() {
             </button>
 
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2 mt-2">
-              Departments
+              Core Modules
             </p>
 
-            {DEPARTMENTS.map((dept) => {
+            {DEPARTMENTS.filter(d => d.section === 'core').map((dept) => {
+              const Icon = dept.icon;
+              return (
+                <button
+                  key={dept.id}
+                  onClick={() => navigate(dept.id)}
+                  className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mt-0.5 ${
+                    currentPage === dept.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {dept.label}
+                </button>
+              );
+            })}
+
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2 mt-4">
+              Advanced
+            </p>
+
+            {DEPARTMENTS.filter(d => d.section === 'admin').map((dept) => {
               const Icon = dept.icon;
               return (
                 <button
@@ -352,8 +388,12 @@ export default function Dashboard() {
             )}
 
             {currentPage === 'bookkeeping' && <BookkeepingPage onBack={goToDashboard} />}
+            {currentPage === 'invoices' && <InvoiceManagerPage onBack={goToDashboard} />}
+            {currentPage === 'accounting' && <AccountingManagerPage onBack={goToDashboard} />}
             {currentPage === 'tax' && <TaxPage onBack={goToDashboard} />}
             {currentPage === 'compliance' && <CompliancePage onBack={goToDashboard} />}
+            {currentPage === 'ai-assistant' && <AIAssistantPage onBack={goToDashboard} />}
+            {currentPage === 'intelligence' && <FinancialIntelligencePage onBack={goToDashboard} />}
             {currentPage === 'audit' && <AuditPage onBack={goToDashboard} />}
             {currentPage === 'risk' && <RiskPage onBack={goToDashboard} />}
             {currentPage === 'forecast' && <ForecastPage onBack={goToDashboard} />}
