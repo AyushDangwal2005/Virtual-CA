@@ -60,28 +60,52 @@ export default function AIAssistantPage({ onBack }: AssistantPageProps) {
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Determine category from input
+      const lowerInput = inputValue.toLowerCase();
+      let category = 'general';
+      if (lowerInput.includes('gst') || lowerInput.includes('tax')) category = 'gst';
+      else if (lowerInput.includes('accounting') || lowerInput.includes('invoice')) category = 'accounting';
+
+      // Call API
+      const response = await fetch('/api/v1/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: inputValue,
+          category,
+          includeRag: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to get response');
+      }
+
       const mockResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: generateMockResponse(inputValue),
-        sources: [
-          {
-            title: 'GST Rules and Regulations',
-            category: 'gst_rules',
-            referenceUrl: 'https://www.gstcouncil.gov.in',
-          },
-          {
-            title: 'Accounting Standards (Ind-AS)',
-            category: 'accounting_standards',
-            referenceUrl: 'https://www.icai.org',
-          },
-        ],
+        content: result.data.answer,
+        sources: result.data.sources?.map((src: any) => ({
+          title: src.title,
+          category: src.category,
+        })) || [],
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, mockResponse]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get response';
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${errorMessage}. Please try again.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorResponse]);
+    } finally {
       setIsLoading(false);
 
       // Auto-scroll to bottom
@@ -90,7 +114,7 @@ export default function AIAssistantPage({ onBack }: AssistantPageProps) {
           scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
         }
       }, 100);
-    }, 1500);
+    }
   };
 
   const suggestedQuestions = [

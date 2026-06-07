@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -53,23 +53,27 @@ interface FinancialIntelligencePageProps {
 export default function FinancialIntelligencePage({ onBack }: FinancialIntelligencePageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [marketIndices, setMarketIndices] = useState<MarketData[]>([]);
+  const [stocks, setStocks] = useState<MarketData[]>([]);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock market data
-  const marketIndices: MarketData[] = [
+  // Mock market data (fallback)
+  const mockMarketIndices: MarketData[] = [
     { symbol: 'NIFTY', name: 'Nifty 50', price: 19250, change: 125, changePercent: 0.65 },
     { symbol: 'SENSEX', name: 'BSE Sensex', price: 65450, change: 350, changePercent: 0.54 },
     { symbol: 'BANKNIFTY', name: 'Bank Nifty', price: 48750, change: 250, changePercent: 0.52 },
     { symbol: 'IT', name: 'Nifty IT', price: 32100, change: -50, changePercent: -0.16 },
   ];
 
-  const stocks: MarketData[] = [
+  const mockStocks: MarketData[] = [
     { symbol: 'INFY', name: 'Infosys', price: 1450, change: 25, changePercent: 1.75 },
     { symbol: 'TCS', name: 'Tata Consultancy', price: 4320, change: -15, changePercent: -0.35 },
     { symbol: 'RELIANCE', name: 'Reliance Industries', price: 3150, change: 45, changePercent: 1.45 },
     { symbol: 'HDFC', name: 'HDFC Bank', price: 1920, change: 30, changePercent: 1.59 },
   ];
 
-  const newsItems: NewsItem[] = [
+  const mockNewsItems: NewsItem[] = [
     {
       id: '1',
       title: 'New GST Rate Changes Announced for Electronics',
@@ -135,11 +139,67 @@ export default function FinancialIntelligencePage({ onBack }: FinancialIntellige
     { date: 'Jun 6', nifty: 19250, sensex: 65450, it: 32100 },
   ];
 
+  // Fetch market data
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        const response = await fetch('/api/v1/market-data?type=indices');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          const indices = [
+            result.data.nifty,
+            result.data.sensex,
+            result.data.bankNifty,
+          ].map((d: any) => ({
+            symbol: d.symbol,
+            name: d.symbol,
+            price: d.price,
+            change: d.change,
+            changePercent: d.changePercent,
+          }));
+          setMarketIndices(indices.length > 0 ? indices : mockMarketIndices);
+        } else {
+          setMarketIndices(mockMarketIndices);
+        }
+      } catch (error) {
+        setMarketIndices(mockMarketIndices);
+      }
+
+      try {
+        const response = await fetch('/api/v1/market-data?type=news');
+        const result = await response.json();
+
+        if (result.success && Array.isArray(result.data)) {
+          const news = result.data.map((item: any, i: number) => ({
+            id: String(i),
+            title: item.title,
+            description: item.description || item.summary || '',
+            source: item.source || 'News',
+            category: 'business' as const,
+            date: new Date(item.publishedAt).toISOString().split('T')[0],
+            url: item.url || '#',
+          }));
+          setNewsItems(news.length > 0 ? news : mockNewsItems);
+        } else {
+          setNewsItems(mockNewsItems);
+        }
+      } catch (error) {
+        setNewsItems(mockNewsItems);
+      }
+
+      setStocks(mockStocks);
+      setLoading(false);
+    };
+
+    fetchMarketData();
+  }, []);
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setRefreshing(false);
+    setLoading(true);
+    // Trigger data refresh
+    window.location.reload();
   };
 
   const getCategoryBadgeColor = (category: string) => {
