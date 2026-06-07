@@ -58,12 +58,10 @@ You provide accurate, professional guidance on:
 Always be precise, cite relevant regulations, and provide actionable advice.
 Context about the user's financials: ${context}`;
 
-    // Start chat
-    const chat = model.startChat({
-      history: chatHistory,
-    });
+    // Create the prompt with system context
+    const fullPrompt = `${systemPrompt}\n\nUser Question: ${question}`;
 
-    const response = await chat.sendMessage(systemPrompt + '\n\nUser Question: ' + question);
+    const response = await model.generateContent(fullPrompt);
     const answer = response.response.text();
 
     // Save to chat history
